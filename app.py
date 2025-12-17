@@ -10,172 +10,168 @@ scaler = joblib.load("scaler.pkl")
 X_encoded = joblib.load("X_encoded_columns.pkl")  # colonnes après one-hot encoding
 
 # -------------------
-# Page et titre
+# Labels français + descriptions
 # -------------------
-st.set_page_config(page_title="Prédiction Prix Immobilier", layout="wide")
-st.title("🏠 Prédiction du Prix de l'Immobilier")
-st.markdown("""
-Remplissez les informations sur la maison.  
-Les valeurs par défaut sont pré-remplies pour faciliter l'utilisation.
-""")
-
-# -------------------
-# Valeurs par défaut et options
-# -------------------
-default_values = {
-    # Exemple de champs numériques
-    "MSSubClass": 20,
-    "LotFrontage": 80,
-    "LotArea": 9600,
-    "OverallQual": 7,
-    "OverallCond": 5,
-    "YearBuilt": 2000,
-    "YearRemodAdd": 2005,
-    "MasVnrArea": 0,
-    "BsmtFinSF1": 0,
-    "BsmtFinSF2": 0,
-    "BsmtUnfSF": 0,
-    "TotalBsmtSF": 0,
-    "1stFlrSF": 900,
-    "2ndFlrSF": 500,
-    "GrLivArea": 1400,
-    "GarageCars": 2,
-    "GarageArea": 400,
-    "WoodDeckSF": 0,
-    "OpenPorchSF": 0,
-    "EnclosedPorch": 0,
-    "ScreenPorch": 0,
-    "PoolArea": 0,
-    "MiscVal": 0,
-    "MoSold": 6,
-    "YrSold": 2020,
-    # Exemple de champs catégoriels
-    "MSZoning": "RL",
-    "Street": "Pave",
-    "Alley": "NA",
-    "LotShape": "Reg",
-    "LandContour": "Lvl",
-    "Utilities": "AllPub",
-    "LotConfig": "FR2",
-    "LandSlope": "Gtl",
-    "Neighborhood": "CollgCr",
-    "Condition1": "Norm",
-    "Condition2": "Norm",
-    "BldgType": "1Fam",
-    "HouseStyle": "2Story",
-    "RoofStyle": "Gable",
-    "RoofMatl": "CompShg",
-    "Exterior1st": "VinylSd",
-    "Exterior2nd": "VinylSd",
-    "MasVnrType": "None",
-    "ExterQual": "Gd",
-    "ExterCond": "TA",
-    "Foundation": "PConc",
-    "BsmtQual": "Gd",
-    "BsmtCond": "TA",
-    "BsmtExposure": "No",
-    "BsmtFinType1": "GLQ",
-    "BsmtFinType2": "Unf",
-    "Heating": "GasA",
-    "HeatingQC": "Ex",
-    "CentralAir": "Y",
-    "Electrical": "SBrkr",
-    "KitchenQual": "Gd",
-    "Functional": "Typ",
-    "FireplaceQu": "NA",
-    "GarageType": "Attchd",
-    "GarageFinish": "Unf",
-    "GarageQual": "TA",
-    "GarageCond": "TA",
-    "PavedDrive": "Y",
-    "PoolQC": "NA",
-    "Fence": "NA",
-    "MiscFeature": "NA",
-    "SaleType": "WD",
-    "SaleCondition": "Normal"
+labels_fr = {
+    "MSSubClass": ("Type construction", "Classe de construction de la maison"),
+    "MSZoning": ("Zone du terrain", "Type de zonage : résidentiel, commercial, etc."),
+    "LotFrontage": ("Façade sur rue", "Longueur du terrain le long de la rue en pieds"),
+    "LotArea": ("Superficie du terrain", "Surface totale du terrain en pieds²"),
+    "Street": ("Type de rue", "Pavé ou non"),
+    "Alley": ("Allée", "Type d'accès secondaire ou NA"),
+    "LotShape": ("Forme du terrain", "Régulier ou irrégulier"),
+    "LandContour": ("Contour du terrain", "Plat ou pente"),
+    "Utilities": ("Services publics", "AllPub=Tout disponible, NoSewr=Non"),
+    "LotConfig": ("Configuration du lot", "FR2, Inside, Corner, CulDSac"),
+    "LandSlope": ("Pente du terrain", "Gtl=Faible, Mod=Moyenne, Sev=Forte"),
+    "Neighborhood": ("Quartier", "Nom du quartier"),
+    "Condition1": ("Proximité route 1", "Route principale proche de la maison"),
+    "Condition2": ("Proximité route 2", "Deuxième route proche de la maison"),
+    "BldgType": ("Type de bâtiment", "1Fam=Maison individuelle, 2FmCon=Duplex..."),
+    "HouseStyle": ("Style de maison", "1Story, 2Story, etc."),
+    "OverallQual": ("Qualité générale", "1=Mauvais, 10=Excellent"),
+    "OverallCond": ("État général", "1 à 10"),
+    "YearBuilt": ("Année construction", "Année de construction"),
+    "YearRemodAdd": ("Année rénovation", "Année de remodelage"),
+    "RoofStyle": ("Style toit", "Gable, Hip, Flat..."),
+    "RoofMatl": ("Matériau toit", "CompShg, Metal, etc."),
+    "Exterior1st": ("Revêtement extérieur 1", "VinylSd, MetalSd, etc."),
+    "Exterior2nd": ("Revêtement extérieur 2", "VinylSd, MetalSd, etc."),
+    "MasVnrType": ("Type maçonnerie", "None, BrkFace, Stone, etc."),
+    "MasVnrArea": ("Surface maçonnerie", "En pieds²"),
+    "ExterQual": ("Qualité extérieur", "Ex=Excellent, Gd=Bon, TA=Correct, Fa=Médiocre, Po=Mauvais"),
+    "ExterCond": ("État extérieur", "Ex, Gd, TA, Fa, Po"),
+    "Foundation": ("Fondation", "PConc, CBlock, BrkTil, Slab, etc."),
+    "BsmtQual": ("Qualité sous-sol", "Ex, Gd, TA, Fa, Po, NA"),
+    "BsmtCond": ("État sous-sol", "Ex, Gd, TA, Fa, Po, NA"),
+    "BsmtExposure": ("Exposition sous-sol", "Gd=Bonne, Av=Moyenne, Mn=Faible, No=Aucune, NA"),
+    "BsmtFinType1": ("Type finition 1", "GLQ, ALQ, BLQ, Rec, LwQ, Unf, NA"),
+    "BsmtFinSF1": ("Surface finie 1", "En pieds²"),
+    "BsmtFinType2": ("Type finition 2", "GLQ, ALQ, BLQ, Rec, LwQ, Unf, NA"),
+    "BsmtFinSF2": ("Surface finie 2", "En pieds²"),
+    "BsmtUnfSF": ("Sous-sol non fini", "En pieds²"),
+    "TotalBsmtSF": ("Surface totale sous-sol", "En pieds²"),
+    "1stFlrSF": ("Surface 1er étage", "En pieds²"),
+    "2ndFlrSF": ("Surface 2ème étage", "En pieds²"),
+    "GrLivArea": ("Surface habitable", "En pieds²"),
+    "GarageCars": ("Capacité garage", "Nombre de voitures"),
+    "GarageArea": ("Surface garage", "En pieds²"),
+    "WoodDeckSF": ("Terrasse bois", "Surface en pieds²"),
+    "OpenPorchSF": ("Porche ouvert", "Surface en pieds²"),
+    "EnclosedPorch": ("Porche fermé", "Surface en pieds²"),
+    "ScreenPorch": ("Porche grillagé", "Surface en pieds²"),
+    "PoolArea": ("Piscine", "Surface en pieds²"),
+    "MiscVal": ("Valeur divers", "Valeur des commodités diverses"),
+    "MoSold": ("Mois de vente", "1=Janvier, 12=Décembre"),
+    "YrSold": ("Année de vente", "Ex: 2010, 2015, etc."),
+    "Heating": ("Type chauffage", "GasA, GasW, Floor, etc."),
+    "HeatingQC": ("Qualité chauffage", "Ex, Gd, TA, Fa, Po"),
+    "CentralAir": ("Climatisation centrale", "Y=Oui, N=Non"),
+    "Electrical": ("Électricité", "SBrkr, FuseF, FuseA, Mix"),
+    "KitchenQual": ("Qualité cuisine", "Ex, Gd, TA, Fa, Po"),
+    "Functional": ("Fonctionnalité maison", "Typ=Normal, Min1=Minimale, etc."),
+    "FireplaceQu": ("Qualité cheminée", "Ex, Gd, TA, Fa, Po, NA"),
+    "GarageType": ("Type garage", "Attchd, Detchd, BuiltIn, CarPort, NA"),
+    "GarageFinish": ("Finition garage", "Fin, RFn, Unf, NA"),
+    "GarageQual": ("Qualité garage", "Ex, Gd, TA, Fa, Po, NA"),
+    "GarageCond": ("État garage", "Ex, Gd, TA, Fa, Po, NA"),
+    "PavedDrive": ("Allée pavée", "Y=Oui, P=Partiel, N=Non"),
+    "PoolQC": ("Qualité piscine", "Ex, Gd, TA, Fa, Po, NA"),
+    "Fence": ("Clôture", "GdPrv, MnPrv, GdWo, MnWw, NA"),
+    "MiscFeature": ("Caractéristiques diverses", "Elev, Gar2, Shed, TenC, NA"),
+    "SaleType": ("Type de vente", "WD, CWD, VWD, ConLD, ConLI, ConLw, Oth"),
+    "SaleCondition": ("Condition vente", "Normal, Abnorml, AdjLand, Alloca, Family, Partial")
 }
 
 # -------------------
-# Créer le formulaire en sections
+# Options pour les selectbox
 # -------------------
+options_dict = {
+    "LandContour": {"Lvl":"Plat","Bnk":"Pente","HLS":"Haut-Bas","Low":"Bas"},
+    "LotShape": {"Reg":"Régulier","IR1":"Irrégulier 1","IR2":"Irrégulier 2","IR3":"Irrégulier 3"},
+    "ExterQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais"},
+    "ExterCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais"},
+    "BsmtQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
+    "BsmtCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
+    "BsmtExposure": {"Gd":"Bonne","Av":"Moyenne","Mn":"Faible","No":"Aucune","NA":"Aucune"},
+    "BsmtFinType1": {"GLQ":"Good Living","ALQ":"Average Living","BLQ":"Basement Living","Rec":"Recréation","LwQ":"Low Quality","Unf":"Non fini","NA":"Aucun"},
+    "BsmtFinType2": {"GLQ":"Good Living","ALQ":"Average Living","BLQ":"Basement Living","Rec":"Recréation","LwQ":"Low Quality","Unf":"Non fini","NA":"Aucun"},
+    "GarageType": {"Attchd":"Attaché","Detchd":"Détaché","BuiltIn":"Intégré","CarPort":"Abri","NA":"Aucun"},
+    "GarageFinish": {"Fin":"Fini","RFn":"Semi-fini","Unf":"Non fini","NA":"Aucun"},
+    "GarageQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
+    "GarageCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
+    "PavedDrive": {"Y":"Oui","P":"Partiel","N":"Non"},
+    "CentralAir": {"Y":"Oui","N":"Non"},
+    "FireplaceQu": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"}
+}
+
+# -------------------
+# Valeurs par défaut
+# -------------------
+default_values = {field: 0 for field in labels_fr.keys()}
+default_values.update({
+    "MSSubClass":20, "LotFrontage":80, "LotArea":9600, "OverallQual":7, "OverallCond":5,
+    "YearBuilt":2000, "YearRemodAdd":2005, "MasVnrArea":0, "BsmtFinSF1":0, "BsmtFinSF2":0,
+    "BsmtUnfSF":0, "TotalBsmtSF":0, "1stFlrSF":900, "2ndFlrSF":500, "GrLivArea":1400,
+    "GarageCars":2, "GarageArea":400, "WoodDeckSF":0, "OpenPorchSF":0, "EnclosedPorch":0,
+    "ScreenPorch":0, "PoolArea":0, "MiscVal":0, "MoSold":6, "YrSold":2020,
+    "MSZoning":"RL", "Street":"Pave", "Alley":"NA", "LotShape":"Reg", "LandContour":"Lvl",
+    "Utilities":"AllPub", "LotConfig":"FR2", "LandSlope":"Gtl", "Neighborhood":"CollgCr",
+    "Condition1":"Norm", "Condition2":"Norm", "BldgType":"1Fam", "HouseStyle":"2Story",
+    "RoofStyle":"Gable", "RoofMatl":"CompShg", "Exterior1st":"VinylSd", "Exterior2nd":"VinylSd",
+    "MasVnrType":"None", "ExterQual":"Gd", "ExterCond":"TA", "Foundation":"PConc",
+    "BsmtQual":"Gd", "BsmtCond":"TA", "BsmtExposure":"No", "BsmtFinType1":"GLQ", "BsmtFinType2":"Unf",
+    "Heating":"GasA", "HeatingQC":"Ex", "CentralAir":"Y", "Electrical":"SBrkr", "KitchenQual":"Gd",
+    "Functional":"Typ", "FireplaceQu":"NA", "GarageType":"Attchd", "GarageFinish":"Unf",
+    "GarageQual":"TA", "GarageCond":"TA", "PavedDrive":"Y", "PoolQC":"NA", "Fence":"NA",
+    "MiscFeature":"NA", "SaleType":"WD", "SaleCondition":"Normal"
+})
+
+# -------------------
+# Formulaire Streamlit final
+# -------------------
+st.set_page_config(page_title="Prédiction Prix Immobilier", layout="wide")
+st.title("🏠 Prédiction du Prix de l'Immobilier")
+st.markdown("Remplissez les informations sur la maison. Les valeurs par défaut sont pré-remplies.")
+
 with st.form(key='maison_form'):
-    st.subheader("🏡 Informations sur le terrain")
+    valeurs = {}
     cols = st.columns(3)
-    terrain_fields = ["MSSubClass", "MSZoning", "LotFrontage", "LotArea", "Street", "Alley", "LotShape", "LandContour", "Utilities", "LotConfig", "LandSlope", "Neighborhood", "Condition1", "Condition2"]
-    terrain_vals = {}
-    for i, field in enumerate(terrain_fields):
+    for i, field in enumerate(labels_fr.keys()):
         col = cols[i % 3]
+        label, desc = labels_fr[field]
         default = default_values[field]
-        if isinstance(default, (int, float)):
-            terrain_vals[field] = col.number_input(field, value=default)
+        st.markdown(f"**{label}**")  # Label en haut
+        col.caption(desc)            # Description en bas
+
+        # Champ catégoriel ou numérique
+        if field in options_dict or isinstance(default, str):
+            valeurs[field] = col.selectbox(
+                label="",
+                options=list(options_dict.get(field, {default: default}).keys()),
+                format_func=lambda x, f=field: options_dict.get(f, {default: default})[x] if f in options_dict else x,
+                index=list(options_dict.get(field, {default: default}).keys()).index(default),
+                key=f"{field}_select"  # clé unique
+            )
         else:
-            terrain_vals[field] = col.selectbox(field, [default], index=0)  # tu peux mettre toutes les options ici
+            valeurs[field] = col.number_input(
+                label="",
+                value=float(default),
+                min_value=0.0,
+                key=f"{field}_num"  # clé unique
+            )
 
-    st.subheader("🏠 Informations sur la maison")
-    cols = st.columns(3)
-    maison_fields = ["BldgType", "HouseStyle", "OverallQual", "OverallCond", "YearBuilt", "YearRemodAdd", "RoofStyle", "RoofMatl", "Exterior1st", "Exterior2nd", "MasVnrType", "MasVnrArea", "ExterQual", "ExterCond", "Foundation"]
-    maison_vals = {}
-    for i, field in enumerate(maison_fields):
-        col = cols[i % 3]
-        default = default_values[field]
-        if isinstance(default, (int, float)):
-            maison_vals[field] = col.number_input(field, value=default)
-        else:
-            maison_vals[field] = col.selectbox(field, [default], index=0)
-
-    st.subheader("🏢 Informations sur le sous-sol")
-    cols = st.columns(3)
-    bsmt_fields = ["BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinSF1", "BsmtFinType2", "BsmtFinSF2", "BsmtUnfSF", "TotalBsmtSF"]
-    bsmt_vals = {}
-    for i, field in enumerate(bsmt_fields):
-        col = cols[i % 3]
-        default = default_values[field]
-        if isinstance(default, (int, float)):
-            bsmt_vals[field] = col.number_input(field, value=default)
-        else:
-            bsmt_vals[field] = col.selectbox(field, [default], index=0)
-
-    st.subheader("🏡 Informations générales")
-    cols = st.columns(3)
-    general_fields = ["1stFlrSF", "2ndFlrSF", "GrLivArea", "GarageCars", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch", "ScreenPorch", "PoolArea", "MiscVal", "MoSold", "YrSold"]
-    general_vals = {}
-    for i, field in enumerate(general_fields):
-        col = cols[i % 3]
-        general_vals[field] = col.number_input(field, value=default_values[field])
-
-    st.subheader("🏘️ Garage, Chauffage, Cuisine et autres")
-    cols = st.columns(3)
-    other_fields = ["Heating", "HeatingQC", "CentralAir", "Electrical", "KitchenQual", "Functional", "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond", "PavedDrive", "PoolQC", "Fence", "MiscFeature", "SaleType", "SaleCondition"]
-    other_vals = {}
-    for i, field in enumerate(other_fields):
-        col = cols[i % 3]
-        default = default_values[field]
-        other_vals[field] = col.selectbox(field, [default], index=0)
-
-    # Fusionner toutes les valeurs
-    valeurs_maison = {**terrain_vals, **maison_vals, **bsmt_vals, **general_vals, **other_vals}
-
-    submit_button = st.form_submit_button(label='💰 Prédire le prix')
+    submit_button = st.form_submit_button(label="💰 Prédire le prix")
 
 # -------------------
 # Prédiction
 # -------------------
 if submit_button:
-    nouvelle_maison_df = pd.DataFrame([valeurs_maison])
-
-    # Encodage identique à X_train
+    nouvelle_maison_df = pd.DataFrame([valeurs])
     nouvelle_maison_encoded = pd.get_dummies(nouvelle_maison_df)
-    # X_encoded_columns est un Index, pas un DataFrame
     nouvelle_maison_encoded = nouvelle_maison_encoded.reindex(columns=X_encoded, fill_value=0)
-
-
-    # Standardisation
     nouvelle_maison_scaled = scaler.transform(nouvelle_maison_encoded)
-
-    # Prédiction
     prix_pred = xgb_model.predict(nouvelle_maison_scaled)
-
-    # Affichage du résultat
     st.markdown("---")
     st.subheader("💡 Résultat")
     st.success(f"Le prix estimé de cette maison est : **{prix_pred[0]:,.2f} $**")
