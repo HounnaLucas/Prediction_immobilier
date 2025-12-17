@@ -1,178 +1,405 @@
+# ============================================================
+# APP STREAMLIT – PRÉDICTION PRIX IMMOBILIER (80 FEATURES)
+# ============================================================
+
 import streamlit as st
 import pandas as pd
 import joblib
 
-# -------------------
-# Charger le modèle et le scaler
-# -------------------
+# ======================
+# CONFIG PAGE
+# ======================
+st.set_page_config(page_title="Prédiction Prix Immobilier", layout="wide")
+
+
+st.title("🏠 Prédiction du Prix de l'Immobilier")
+
+# ======================
+# FOND CITE + STYLE FORMULAIRE PREMIUM
+# ======================
+st.markdown(
+    """
+    <style>
+   
+
+    /* Conteneur du formulaire */
+    .block-container {
+        background-color: rgba(255, 255, 255, 0.95); /* fond blanc semi-transparent pour le bloc */
+        padding: 2rem;
+        border-radius: 12px;
+    }
+
+    /* Titres des cellules */
+    .cell-title {
+        background-color: #FFA500; /* jaune/orange */
+        color: #000000;
+        font-weight: bold;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-bottom: 2px;
+    }
+
+    /* Description sous chaque cellule */
+    .cell-help {
+        color: #000000; /* noir */
+        font-size: 0.85rem;
+        margin-top: 2px;
+    }
+
+    /* Fond des champs input */
+    .stNumberInput, .stSelectbox {
+        background-color: #d3d3d3; /* gris clair */
+        border-radius: 6px;
+        padding: 4px;
+    }
+
+    /* Galerie d’images défilable */
+    .scrolling-wrapper {
+        overflow-x: auto;
+        display: flex;
+        flex-wrap: nowrap;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+    .scrolling-wrapper .card {
+        flex: 0 0 auto;
+        width: 220px;
+        margin-right: 1rem;
+        text-align: center;
+    }
+    .scrolling-wrapper img {
+        border-radius: 10px;
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ======================
+# GALERIE DE MAISONS (12 MAISONS, DÉFILEMENT HORIZONTAL)
+# ======================
+st.markdown("### Maisons en vogues")
+
+maisons = [
+    ("Maison moderne", "https://images.unsplash.com/photo-1568605114967-8130f3a36994"),
+    ("Maison familiale", "https://images.unsplash.com/photo-1572120360610-d971b9b78825"),
+    ("Villa de luxe", "https://images.unsplash.com/photo-1600585154340-be6161a56a0c"),
+    ("Maison urbaine", "https://images.unsplash.com/photo-1598928506311-c55ded91a20c"),
+    ("Maison contemporaine", "https://images.unsplash.com/photo-1580587771525-78b9dba3b914"),
+    ("Maison en bois", "https://images.unsplash.com/photo-1507089947368-19c1da9775ae"),
+    ("Petit pavillon", "https://images.unsplash.com/photo-1618223419713-f96f7c4c99d5"),
+    ("Maison de campagne", "https://images.unsplash.com/photo-1600585154276-7ed86b4b3c43"),
+    ("Villa moderne", "https://images.unsplash.com/photo-1542317854-7ef12ecf5fa7"),
+    ("Maison sur pilotis", "https://images.unsplash.com/photo-1600585154142-4620c6e1ee82"),
+    ("Maison en pierre", "https://images.unsplash.com/photo-1568605114968-82e4a3f0468e"),
+    ("Maison minimaliste", "https://images.unsplash.com/photo-1600585154255-918987b7f9d1")
+]
+
+html = '<div class="scrolling-wrapper">'
+for titre, url in maisons:
+    html += f'<div class="card"><img src="{url}"><p style="font-weight:600">{titre}</p></div>'
+html += '</div>'
+
+st.markdown(html, unsafe_allow_html=True)
+
+# ======================
+# FONCTIONS DE FORMULAIRE AVEC STYLE
+# ======================
+def champ_number(col, key, label, help_txt, default=0):
+    col.markdown(f"<div class='cell-title'>{label}</div>", unsafe_allow_html=True)
+    val = col.number_input("", value=default, key=key)
+    col.markdown(f"<div class='cell-help'>{help_txt}</div>", unsafe_allow_html=True)
+    return val
+
+def champ_select(col, key, label, help_txt, options):
+    col.markdown(f"<div class='cell-title'>{label}</div>", unsafe_allow_html=True)
+    choix = col.selectbox("", list(options.keys()), key=key)
+    col.markdown(f"<div class='cell-help'>{help_txt}</div>", unsafe_allow_html=True)
+    return options[choix]
+
+st.markdown("Remplissez les caractéristiques de la maison. Toutes les variables du dataset Ames Housing sont incluses.")
+
+
+# ======================
+# CHARGEMENT MODÈLE
+# ======================
 xgb_model = joblib.load("xgb_model.pkl")
 scaler = joblib.load("scaler.pkl")
-X_encoded = joblib.load("X_encoded_columns.pkl")  # colonnes après one-hot encoding
+X_encoded = joblib.load("X_encoded_columns.pkl")
 
-# -------------------
-# Labels français + descriptions
-# -------------------
-labels_fr = {
-    "MSSubClass": ("Type construction", "Classe de construction de la maison"),
-    "MSZoning": ("Zone du terrain", "Type de zonage : résidentiel, commercial, etc."),
-    "LotFrontage": ("Façade sur rue", "Longueur du terrain le long de la rue en pieds"),
-    "LotArea": ("Superficie du terrain", "Surface totale du terrain en pieds²"),
-    "Street": ("Type de rue", "Pavé ou non"),
-    "Alley": ("Allée", "Type d'accès secondaire ou NA"),
-    "LotShape": ("Forme du terrain", "Régulier ou irrégulier"),
-    "LandContour": ("Contour du terrain", "Plat ou pente"),
-    "Utilities": ("Services publics", "AllPub=Tout disponible, NoSewr=Non"),
-    "LotConfig": ("Configuration du lot", "FR2, Inside, Corner, CulDSac"),
-    "LandSlope": ("Pente du terrain", "Gtl=Faible, Mod=Moyenne, Sev=Forte"),
-    "Neighborhood": ("Quartier", "Nom du quartier"),
-    "Condition1": ("Proximité route 1", "Route principale proche de la maison"),
-    "Condition2": ("Proximité route 2", "Deuxième route proche de la maison"),
-    "BldgType": ("Type de bâtiment", "1Fam=Maison individuelle, 2FmCon=Duplex..."),
-    "HouseStyle": ("Style de maison", "1Story, 2Story, etc."),
-    "OverallQual": ("Qualité générale", "1=Mauvais, 10=Excellent"),
-    "OverallCond": ("État général", "1 à 10"),
-    "YearBuilt": ("Année construction", "Année de construction"),
-    "YearRemodAdd": ("Année rénovation", "Année de remodelage"),
-    "RoofStyle": ("Style toit", "Gable, Hip, Flat..."),
-    "RoofMatl": ("Matériau toit", "CompShg, Metal, etc."),
-    "Exterior1st": ("Revêtement extérieur 1", "VinylSd, MetalSd, etc."),
-    "Exterior2nd": ("Revêtement extérieur 2", "VinylSd, MetalSd, etc."),
-    "MasVnrType": ("Type maçonnerie", "None, BrkFace, Stone, etc."),
-    "MasVnrArea": ("Surface maçonnerie", "En pieds²"),
-    "ExterQual": ("Qualité extérieur", "Ex=Excellent, Gd=Bon, TA=Correct, Fa=Médiocre, Po=Mauvais"),
-    "ExterCond": ("État extérieur", "Ex, Gd, TA, Fa, Po"),
-    "Foundation": ("Fondation", "PConc, CBlock, BrkTil, Slab, etc."),
-    "BsmtQual": ("Qualité sous-sol", "Ex, Gd, TA, Fa, Po, NA"),
-    "BsmtCond": ("État sous-sol", "Ex, Gd, TA, Fa, Po, NA"),
-    "BsmtExposure": ("Exposition sous-sol", "Gd=Bonne, Av=Moyenne, Mn=Faible, No=Aucune, NA"),
-    "BsmtFinType1": ("Type finition 1", "GLQ, ALQ, BLQ, Rec, LwQ, Unf, NA"),
-    "BsmtFinSF1": ("Surface finie 1", "En pieds²"),
-    "BsmtFinType2": ("Type finition 2", "GLQ, ALQ, BLQ, Rec, LwQ, Unf, NA"),
-    "BsmtFinSF2": ("Surface finie 2", "En pieds²"),
-    "BsmtUnfSF": ("Sous-sol non fini", "En pieds²"),
-    "TotalBsmtSF": ("Surface totale sous-sol", "En pieds²"),
-    "1stFlrSF": ("Surface 1er étage", "En pieds²"),
-    "2ndFlrSF": ("Surface 2ème étage", "En pieds²"),
-    "GrLivArea": ("Surface habitable", "En pieds²"),
-    "GarageCars": ("Capacité garage", "Nombre de voitures"),
-    "GarageArea": ("Surface garage", "En pieds²"),
-    "WoodDeckSF": ("Terrasse bois", "Surface en pieds²"),
-    "OpenPorchSF": ("Porche ouvert", "Surface en pieds²"),
-    "EnclosedPorch": ("Porche fermé", "Surface en pieds²"),
-    "ScreenPorch": ("Porche grillagé", "Surface en pieds²"),
-    "PoolArea": ("Piscine", "Surface en pieds²"),
-    "MiscVal": ("Valeur divers", "Valeur des commodités diverses"),
-    "MoSold": ("Mois de vente", "1=Janvier, 12=Décembre"),
-    "YrSold": ("Année de vente", "Ex: 2010, 2015, etc."),
-    "Heating": ("Type chauffage", "GasA, GasW, Floor, etc."),
-    "HeatingQC": ("Qualité chauffage", "Ex, Gd, TA, Fa, Po"),
-    "CentralAir": ("Climatisation centrale", "Y=Oui, N=Non"),
-    "Electrical": ("Électricité", "SBrkr, FuseF, FuseA, Mix"),
-    "KitchenQual": ("Qualité cuisine", "Ex, Gd, TA, Fa, Po"),
-    "Functional": ("Fonctionnalité maison", "Typ=Normal, Min1=Minimale, etc."),
-    "FireplaceQu": ("Qualité cheminée", "Ex, Gd, TA, Fa, Po, NA"),
-    "GarageType": ("Type garage", "Attchd, Detchd, BuiltIn, CarPort, NA"),
-    "GarageFinish": ("Finition garage", "Fin, RFn, Unf, NA"),
-    "GarageQual": ("Qualité garage", "Ex, Gd, TA, Fa, Po, NA"),
-    "GarageCond": ("État garage", "Ex, Gd, TA, Fa, Po, NA"),
-    "PavedDrive": ("Allée pavée", "Y=Oui, P=Partiel, N=Non"),
-    "PoolQC": ("Qualité piscine", "Ex, Gd, TA, Fa, Po, NA"),
-    "Fence": ("Clôture", "GdPrv, MnPrv, GdWo, MnWw, NA"),
-    "MiscFeature": ("Caractéristiques diverses", "Elev, Gar2, Shed, TenC, NA"),
-    "SaleType": ("Type de vente", "WD, CWD, VWD, ConLD, ConLI, ConLw, Oth"),
-    "SaleCondition": ("Condition vente", "Normal, Abnorml, AdjLand, Alloca, Family, Partial")
+# ======================
+# OUTILS UI
+# ======================
+QUAL = {
+    "Excellent": "Ex",
+    "Bon": "Gd",
+    "Moyen": "TA",
+    "Faible": "Fa",
+    "Mauvais": "Po",
+    "Aucun": "NA"
 }
 
-# -------------------
-# Options pour les selectbox
-# -------------------
-options_dict = {
-    "LandContour": {"Lvl":"Plat","Bnk":"Pente","HLS":"Haut-Bas","Low":"Bas"},
-    "LotShape": {"Reg":"Régulier","IR1":"Irrégulier 1","IR2":"Irrégulier 2","IR3":"Irrégulier 3"},
-    "ExterQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais"},
-    "ExterCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais"},
-    "BsmtQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
-    "BsmtCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
-    "BsmtExposure": {"Gd":"Bonne","Av":"Moyenne","Mn":"Faible","No":"Aucune","NA":"Aucune"},
-    "BsmtFinType1": {"GLQ":"Good Living","ALQ":"Average Living","BLQ":"Basement Living","Rec":"Recréation","LwQ":"Low Quality","Unf":"Non fini","NA":"Aucun"},
-    "BsmtFinType2": {"GLQ":"Good Living","ALQ":"Average Living","BLQ":"Basement Living","Rec":"Recréation","LwQ":"Low Quality","Unf":"Non fini","NA":"Aucun"},
-    "GarageType": {"Attchd":"Attaché","Detchd":"Détaché","BuiltIn":"Intégré","CarPort":"Abri","NA":"Aucun"},
-    "GarageFinish": {"Fin":"Fini","RFn":"Semi-fini","Unf":"Non fini","NA":"Aucun"},
-    "GarageQual": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
-    "GarageCond": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"},
-    "PavedDrive": {"Y":"Oui","P":"Partiel","N":"Non"},
-    "CentralAir": {"Y":"Oui","N":"Non"},
-    "FireplaceQu": {"Ex":"Excellent","Gd":"Bon","TA":"Correct","Fa":"Médiocre","Po":"Mauvais","NA":"Aucun"}
-}
+def champ_number(col, key, label, help_txt, default=0):
+    col.markdown(f"**{label}**")
+    val = col.number_input("", value=default, key=key)
+    col.caption(help_txt)
+    return val
 
-# -------------------
-# Valeurs par défaut
-# -------------------
-default_values = {field: 0 for field in labels_fr.keys()}
-default_values.update({
-    "MSSubClass":20, "LotFrontage":80, "LotArea":9600, "OverallQual":7, "OverallCond":5,
-    "YearBuilt":2000, "YearRemodAdd":2005, "MasVnrArea":0, "BsmtFinSF1":0, "BsmtFinSF2":0,
-    "BsmtUnfSF":0, "TotalBsmtSF":0, "1stFlrSF":900, "2ndFlrSF":500, "GrLivArea":1400,
-    "GarageCars":2, "GarageArea":400, "WoodDeckSF":0, "OpenPorchSF":0, "EnclosedPorch":0,
-    "ScreenPorch":0, "PoolArea":0, "MiscVal":0, "MoSold":6, "YrSold":2020,
-    "MSZoning":"RL", "Street":"Pave", "Alley":"NA", "LotShape":"Reg", "LandContour":"Lvl",
-    "Utilities":"AllPub", "LotConfig":"FR2", "LandSlope":"Gtl", "Neighborhood":"CollgCr",
-    "Condition1":"Norm", "Condition2":"Norm", "BldgType":"1Fam", "HouseStyle":"2Story",
-    "RoofStyle":"Gable", "RoofMatl":"CompShg", "Exterior1st":"VinylSd", "Exterior2nd":"VinylSd",
-    "MasVnrType":"None", "ExterQual":"Gd", "ExterCond":"TA", "Foundation":"PConc",
-    "BsmtQual":"Gd", "BsmtCond":"TA", "BsmtExposure":"No", "BsmtFinType1":"GLQ", "BsmtFinType2":"Unf",
-    "Heating":"GasA", "HeatingQC":"Ex", "CentralAir":"Y", "Electrical":"SBrkr", "KitchenQual":"Gd",
-    "Functional":"Typ", "FireplaceQu":"NA", "GarageType":"Attchd", "GarageFinish":"Unf",
-    "GarageQual":"TA", "GarageCond":"TA", "PavedDrive":"Y", "PoolQC":"NA", "Fence":"NA",
-    "MiscFeature":"NA", "SaleType":"WD", "SaleCondition":"Normal"
-})
+def champ_select(col, key, label, help_txt, options):
+    col.markdown(f"**{label}**")
+    choix = col.selectbox(
+        "",
+        list(options.keys()),
+        key=key
+    )
+    col.caption(help_txt)
+    return options[choix]
 
-# -------------------
-# Formulaire Streamlit final
-# -------------------
-st.set_page_config(page_title="Prédiction Prix Immobilier", layout="wide")
-st.title("🏠 Prédiction du Prix de l'Immobilier")
-st.markdown("Remplissez les informations sur la maison. Les valeurs par défaut sont pré-remplies.")
+# ======================
+# FORMULAIRE
+# ======================
+vals = {}
 
-with st.form(key='maison_form'):
-    valeurs = {}
-    cols = st.columns(3)
-    for i, field in enumerate(labels_fr.keys()):
-        col = cols[i % 3]
-        label, desc = labels_fr[field]
-        default = default_values[field]
-        st.markdown(f"**{label}**")  # Label en haut
-        col.caption(desc)            # Description en bas
+with st.form("form_maison"):
 
-        # Champ catégoriel ou numérique
-        if field in options_dict or isinstance(default, str):
-            valeurs[field] = col.selectbox(
-                label="",
-                options=list(options_dict.get(field, {default: default}).keys()),
-                format_func=lambda x, f=field: options_dict.get(f, {default: default})[x] if f in options_dict else x,
-                index=list(options_dict.get(field, {default: default}).keys()).index(default),
-                key=f"{field}_select"  # clé unique
-            )
-        else:
-            valeurs[field] = col.number_input(
-                label="",
-                value=float(default),
-                min_value=0.0,
-                key=f"{field}_num"  # clé unique
-            )
+    # ======================
+    st.subheader("🏡 1. Structure & Style")
+    c = st.columns(3)
 
-    submit_button = st.form_submit_button(label="💰 Prédire le prix")
+    vals["MSSubClass"] = champ_number(c[0], "MSSubClass", "Type maison",
+        "Type et époque de construction", 20)
 
-# -------------------
-# Prédiction
-# -------------------
-if submit_button:
-    nouvelle_maison_df = pd.DataFrame([valeurs])
-    nouvelle_maison_encoded = pd.get_dummies(nouvelle_maison_df)
-    nouvelle_maison_encoded = nouvelle_maison_encoded.reindex(columns=X_encoded, fill_value=0)
-    nouvelle_maison_scaled = scaler.transform(nouvelle_maison_encoded)
-    prix_pred = xgb_model.predict(nouvelle_maison_scaled)
-    st.markdown("---")
-    st.subheader("💡 Résultat")
-    st.success(f"Le prix estimé de cette maison est : **{prix_pred[0]:,.2f} $**")
+    vals["BldgType"] = champ_select(c[1], "BldgType", "Type logement",
+        "Maison individuelle, duplex, etc.",
+        {"Maison individuelle": "1Fam", "Duplex": "Duplex", "Townhouse": "Twnhs"})
+
+    vals["HouseStyle"] = champ_select(c[2], "HouseStyle", "Style maison",
+        "Style architectural",
+        {"1 étage": "1Story", "2 étages": "2Story", "Split": "SLvl"})
+
+    vals["OverallQual"] = champ_number(c[0], "OverallQual", "Qualité globale",
+        "Note de qualité (1–10)", 7)
+
+    vals["OverallCond"] = champ_number(c[1], "OverallCond", "État global",
+        "Note d’état (1–10)", 5)
+
+    vals["YearBuilt"] = champ_number(c[2], "YearBuilt", "Année construction",
+        "Année de construction", 2000)
+
+    vals["YearRemodAdd"] = champ_number(c[0], "YearRemodAdd", "Année rénovation",
+        "Dernière rénovation", 2005)
+
+    # ======================
+    st.subheader("🌍 2. Terrain")
+    c = st.columns(3)
+
+    vals["MSZoning"] = champ_select(c[0], "MSZoning", "Zonage",
+        "Type de zone",
+        {"Résidentiel faible": "RL", "Résidentiel dense": "RM", "Commercial": "C"})
+
+    vals["LotFrontage"] = champ_number(c[1], "LotFrontage", "Façade",
+        "Longueur façade (m)", 80)
+
+    vals["LotArea"] = champ_number(c[2], "LotArea", "Surface terrain",
+        "Surface totale du terrain", 9600)
+
+    vals["Street"] = champ_select(c[0], "Street", "Rue",
+        "Type de rue",
+        {"Pavée": "Pave", "Gravier": "Grvl"})
+
+    vals["Alley"] = champ_select(c[1], "Alley", "Allée",
+        "Type d’allée",
+        {"Aucune": "NA", "Pavée": "Pave", "Gravier": "Grvl"})
+
+    vals["LotShape"] = champ_select(c[2], "LotShape", "Forme terrain",
+        "Forme du terrain",
+        {"Régulier": "Reg", "Légèrement irrégulier": "IR1", "Irrégulier": "IR2"})
+
+    vals["LandContour"] = champ_select(c[0], "LandContour", "Contour",
+        "Topographie du terrain",
+        {"Plat": "Lvl", "Pente douce": "Bnk", "Dépression": "Low"})
+
+    vals["LotConfig"] = champ_select(c[1], "LotConfig", "Configuration",
+        "Disposition du terrain",
+        {"Intérieur": "Inside", "Angle": "Corner", "Cul-de-sac": "CulDSac"})
+
+    vals["LandSlope"] = champ_select(c[2], "LandSlope", "Pente",
+        "Inclinaison du terrain",
+        {"Douce": "Gtl", "Modérée": "Mod", "Forte": "Sev"})
+
+    vals["Neighborhood"] = champ_select(c[0], "Neighborhood", "Quartier",
+        "Quartier de localisation",
+        {"Résidentiel": "CollgCr", "Centre": "NAmes", "Luxe": "NridgHt"})
+
+    vals["Condition1"] = champ_select(c[1], "Condition1", "Condition 1",
+        "Influence environnementale principale",
+        {"Normale": "Norm", "Route": "Artery", "Rail": "RRAn"})
+
+    vals["Condition2"] = champ_select(c[2], "Condition2", "Condition 2",
+        "Influence environnementale secondaire",
+        {"Normale": "Norm", "Route": "Artery", "Rail": "RRAn"})
+
+    # ======================
+    st.subheader("🏗️ 3. Construction")
+    c = st.columns(3)
+
+    vals["RoofStyle"] = champ_select(c[0], "RoofStyle", "Style toit",
+        "Forme du toit",
+        {"Gable": "Gable", "Hip": "Hip", "Flat": "Flat"})
+
+    vals["RoofMatl"] = champ_select(c[1], "RoofMatl", "Matériau toit",
+        "Matériau de couverture",
+        {"Bardeaux": "CompShg", "Métal": "Metal", "Tuile": "Tile"})
+
+    vals["Exterior1st"] = champ_select(c[2], "Exterior1st", "Façade principale",
+        "Matériau extérieur principal",
+        {"Vinyle": "VinylSd", "Brique": "BrkFace", "Bois": "Wd Sdng"})
+
+    vals["Exterior2nd"] = champ_select(c[0], "Exterior2nd", "Façade secondaire",
+        "Matériau extérieur secondaire",
+        {"Vinyle": "VinylSd", "Brique": "BrkFace", "Bois": "Wd Sdng"})
+
+    vals["MasVnrType"] = champ_select(c[1], "MasVnrType", "Maçonnerie",
+        "Type de revêtement maçonné",
+        {"Aucun": "None", "Brique": "BrkFace", "Pierre": "Stone"})
+
+    vals["MasVnrArea"] = champ_number(c[2], "MasVnrArea", "Surface maçonnerie",
+        "Surface en maçonnerie", 0)
+
+    vals["Foundation"] = champ_select(c[0], "Foundation", "Fondation",
+        "Type de fondation",
+        {"Béton": "PConc", "Brique": "BrkTil", "Dalle": "Slab"})
+
+    # ======================
+    st.subheader("🏠 4. Sous-sol")
+    c = st.columns(3)
+
+    vals["BsmtQual"] = champ_select(c[0], "BsmtQual", "Qualité sous-sol",
+        "Qualité du sous-sol", QUAL)
+
+    vals["BsmtCond"] = champ_select(c[1], "BsmtCond", "État sous-sol",
+        "État du sous-sol", QUAL)
+
+    vals["BsmtExposure"] = champ_select(c[2], "BsmtExposure", "Exposition",
+        "Luminosité du sous-sol",
+        {"Aucune": "No", "Faible": "Mn", "Bonne": "Gd"})
+
+    vals["BsmtFinType1"] = champ_select(c[0], "BsmtFinType1", "Finition SS1",
+        "Type finition principale",
+        {"Non fini": "Unf", "Habitable": "GLQ"})
+
+    vals["BsmtFinSF1"] = champ_number(c[1], "BsmtFinSF1", "Surface SS1",
+        "Surface finie principale", 0)
+
+    vals["BsmtFinType2"] = champ_select(c[2], "BsmtFinType2", "Finition SS2",
+        "Type finition secondaire",
+        {"Non fini": "Unf", "Habitable": "ALQ"})
+
+    vals["BsmtFinSF2"] = champ_number(c[0], "BsmtFinSF2", "Surface SS2",
+        "Surface finie secondaire", 0)
+
+    vals["BsmtUnfSF"] = champ_number(c[1], "BsmtUnfSF", "Surface non finie",
+        "Surface non finie sous-sol", 0)
+
+    vals["TotalBsmtSF"] = champ_number(c[2], "TotalBsmtSF", "Surface totale SS",
+        "Surface totale du sous-sol", 0)
+
+    # ======================
+    st.subheader("🛋️ 5. Intérieur")
+    c = st.columns(3)
+
+    vals["1stFlrSF"] = champ_number(c[0], "1stFlrSF", "Surface RDC",
+        "Surface rez-de-chaussée", 900)
+
+    vals["2ndFlrSF"] = champ_number(c[1], "2ndFlrSF", "Surface étage",
+        "Surface étage supérieur", 500)
+
+    vals["GrLivArea"] = champ_number(c[2], "GrLivArea", "Surface habitable",
+        "Surface habitable totale", 1400)
+
+    vals["BedroomAbvGr"] = champ_number(c[0], "BedroomAbvGr", "Chambres",
+        "Nombre de chambres", 3)
+
+    vals["KitchenAbvGr"] = champ_number(c[1], "KitchenAbvGr", "Cuisines",
+        "Nombre de cuisines", 1)
+
+    vals["KitchenQual"] = champ_select(c[2], "KitchenQual", "Qualité cuisine",
+        "Qualité de la cuisine", QUAL)
+
+    vals["TotRmsAbvGrd"] = champ_number(c[0], "TotRmsAbvGrd", "Pièces totales",
+        "Nombre total de pièces", 6)
+
+    vals["Functional"] = champ_select(c[1], "Functional", "Fonctionnalité",
+        "Fonctionnalité globale",
+        {"Fonctionnelle": "Typ", "Limitée": "Min1"})
+
+    # ======================
+    st.subheader("🚗 6. Garage & Extérieur")
+    c = st.columns(3)
+
+    vals["GarageType"] = champ_select(c[0], "GarageType", "Type garage",
+        "Type de garage",
+        {"Attaché": "Attchd", "Détaché": "Detchd", "Aucun": "NA"})
+
+    vals["GarageCars"] = champ_number(c[1], "GarageCars", "Places garage",
+        "Capacité du garage", 2)
+
+    vals["GarageArea"] = champ_number(c[2], "GarageArea", "Surface garage",
+        "Surface du garage", 400)
+
+    vals["PavedDrive"] = champ_select(c[0], "PavedDrive", "Allée pavée",
+        "Allée pavée ou non",
+        {"Oui": "Y", "Non": "N"})
+
+    vals["WoodDeckSF"] = champ_number(c[1], "WoodDeckSF", "Terrasse bois",
+        "Surface terrasse bois", 0)
+
+    vals["OpenPorchSF"] = champ_number(c[2], "OpenPorchSF", "Porche ouvert",
+        "Surface porche ouvert", 0)
+
+    vals["ScreenPorch"] = champ_number(c[0], "ScreenPorch", "Porche écran",
+        "Surface porche moustiquaire", 0)
+
+    vals["PoolArea"] = champ_number(c[1], "PoolArea", "Piscine",
+        "Surface piscine", 0)
+
+    vals["MiscVal"] = champ_number(c[2], "MiscVal", "Valeur annexe",
+        "Valeur équipements annexes", 0)
+
+    # ======================
+    st.subheader("💰 7. Vente")
+    c = st.columns(3)
+
+    vals["MoSold"] = champ_number(c[0], "MoSold", "Mois vente",
+        "Mois de la vente", 6)
+
+    vals["YrSold"] = champ_number(c[1], "YrSold", "Année vente",
+        "Année de la vente", 2020)
+
+    vals["SaleType"] = champ_select(c[2], "SaleType", "Type vente",
+        "Type de transaction",
+        {"Standard": "WD", "Cash": "Cash", "Neuf": "New"})
+
+    vals["SaleCondition"] = champ_select(c[0], "SaleCondition", "Condition vente",
+        "Condition de la vente",
+        {"Normale": "Normal", "Famille": "Family", "Forclusion": "Abnorml"})
+
+    # ======================
+    submit = st.form_submit_button("💰 Prédire le prix")
+
+# ======================
+# PRÉDICTION
+# ======================
+if submit:
+    df = pd.DataFrame([vals])
+    df_encoded = pd.get_dummies(df)
+    df_encoded = df_encoded.reindex(columns=X_encoded, fill_value=0)
+    df_scaled = scaler.transform(df_encoded)
+    prix = xgb_model.predict(df_scaled)
+
+    st.success(f"🏷️ Prix estimé : **{prix[0]:,.0f} $**")
     st.balloons()
